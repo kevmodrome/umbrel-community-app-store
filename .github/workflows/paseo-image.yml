@@ -67,4 +67,3 @@ jobs:
           IMAGE_REF: ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}@${{ steps.build.outputs.digest }}
         run: |
           printf '### Paseo image\n\n`%s`\n' "$IMAGE_REF" >> "$GITHUB_STEP_SUMMARY"
-

@@ -6,13 +6,30 @@ image="${1:?Usage: smoke-test.sh IMAGE}"
 name="umbrel-paseo-smoke-$$"
 home_volume="${name}-home"
 workspace_volume="${name}-workspace"
+current_stage=initialization
+
+stage() {
+  current_stage="$1"
+  printf 'Paseo smoke: %s\n' "$current_stage"
+}
 
 cleanup() {
   docker rm -f "$name" >/dev/null 2>&1 || true
   docker volume rm "$home_volume" "$workspace_volume" >/dev/null 2>&1 || true
 }
-trap cleanup EXIT
+finish() {
+  result=$?
+  if [ "$result" -ne 0 ]; then
+    printf 'Paseo smoke failed during: %s (exit %s)\n' "$current_stage" "$result" >&2
+    docker logs "$name" >&2 || true
+    docker exec "$name" ps -eo pid,uid,args >&2 || true
+  fi
+  cleanup
+  return "$result"
+}
+trap finish EXIT
 
+stage 'prepare persistent volumes'
 docker volume create "$home_volume" >/dev/null
 docker volume create "$workspace_volume" >/dev/null
 # Umbrel creates app-data sources as 1000:1000; reproduce that ownership.
@@ -43,7 +60,9 @@ start() {
   return 1
 }
 
+stage 'start daemon and wait for health'
 start
+stage 'run agent CLIs and write persistent files as UID 1000'
 docker exec --user paseo "$name" sh -ec '
   test "$(id -u)" = 1000
   codex --version
@@ -54,11 +73,14 @@ docker exec --user paseo "$name" sh -ec '
   printf retained > /workspace/smoke-persistence
 '
 # The running supervisor, not just docker exec, must drop privileges.
+stage 'verify running supervisor UID'
 docker exec "$name" sh -ec '
-  pid="$(pgrep -f "[s]upervisor-entrypoint.js" | head -n 1)"
+  # Upstream explicitly sets process.title, replacing the original Node argv.
+  pid="$(pgrep -f "^Paseo Supervisor$" || true)"
   test -n "$pid"
   test "$(ps -o uid= -p "$pid" | tr -d " ")" = 1000
 '
+stage 'verify browser UI, HTTP password, and hostname validation'
 docker exec -i "$name" node <<'NODE'
 const assert = require('node:assert/strict');
 const http = require('node:http');
@@ -86,6 +108,7 @@ function get(path, host, token) {
 })().catch(error => { console.error(error); process.exitCode = 1; });
 NODE
 # Use Paseo's own client protocol to exercise the authenticated WebSocket path.
+stage 'connect authenticated Paseo WebSocket client'
 docker exec --user paseo "$name" node -e '
   const { spawnSync } = require("node:child_process");
   const result = spawnSync("paseo", ["project", "ls", "--host", "127.0.0.1:6767"], { stdio: "inherit", timeout: 20000 });
@@ -93,6 +116,7 @@ docker exec --user paseo "$name" node -e '
   process.exit(result.status === 0 ? 0 : 1);
 '
 
+stage 'replace container and verify persistent files'
 docker rm -f "$name" >/dev/null
 start
 docker exec --user paseo "$name" sh -ec '
