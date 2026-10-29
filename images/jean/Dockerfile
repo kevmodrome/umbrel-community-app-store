@@ -6,9 +6,9 @@ FROM ghcr.io/coollabsio/jean-server:v1.0.13@sha256:24f5bbcf89695d4bbe7b7b77de295
 LABEL org.opencontainers.image.title="Jean for Umbrel" \
       org.opencontainers.image.version="1.0.13-1" \
       org.opencontainers.image.source="https://github.com/kevmodrome/umbrel-community-app-store" \
-      org.opencontainers.image.description="Jean headless server with Node.js and npm for browser onboarding"
+      org.opencontainers.image.description="Jean headless server with Node.js and npm for agent tooling"
 
-# Jean's onboarding requires Node/npm before users can install their agents.
+# Jean's agent setup requires Node/npm before users can install their agents.
 # Keep these in the image so a fresh persistent home needs no bootstrap download.
 USER root
 COPY --from=node /usr/local/bin/node /usr/local/bin/node

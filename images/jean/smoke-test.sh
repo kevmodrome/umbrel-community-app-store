@@ -13,29 +13,28 @@ export JEAN_SMOKE_PACKAGE_HOME="$(cd "$(dirname "$0")/../../kevmodrome-jean/data
 node --input-type=module <<'JS'
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { chmodSync, cpSync, mkdtempSync, rmSync } from 'node:fs';
+import { cpSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { setTimeout as delay } from 'node:timers/promises';
 
 const home = mkdtempSync(join(tmpdir(), 'jean-smoke-'));
 cpSync(process.env.JEAN_SMOKE_PACKAGE_HOME, home, { recursive: true });
-// Umbrel owns production bind sources as 1000:1000. Permit the image's UID
-// 1000 to write this temporary cross-platform test directory as well.
-chmodSync(home, 0o777);
 const name = `jean-smoke-${process.pid}`;
 const token = 'a'.repeat(64);
 const image = process.env.JEAN_SMOKE_IMAGE;
 let created = false;
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8' }).trim();
 
+function fixtureOwner(uid, gid) {
+  // Umbrel installs package data as 1000:1000. CI runners can be UID 1001;
+  // adjust only this disposable bind source to reproduce Umbrel's ownership.
+  docker('run', '--rm', '--network', 'none', '--user', '0',
+    '--entrypoint', '/bin/chown', '--volume', `${home}:/fixture`, image,
+    '-R', `${uid}:${gid}`, '/fixture');
+}
+
 function removeContainer() {
-  // Linux CI may run as a host UID different from the image's UID 1000.
-  // Make only our disposable home's descendants removable by that host UID.
-  try {
-    docker('exec', name, 'sh', '-c',
-      'chmod -R a+rwX /home/jean/* /home/jean/.[!.]* 2>/dev/null || true');
-  } catch {}
   docker('rm', '--force', name);
   created = false;
 }
@@ -93,6 +92,7 @@ async function connect(origin) {
 }
 
 try {
+  fixtureOwner(1000, 1000);
   let origin = await start();
   assert.equal((await fetch(`${origin}/healthz`)).status, 200);
   assert.equal((await fetch(origin)).status, 200);
@@ -102,11 +102,28 @@ try {
   })).status, 401);
   const headers = { Authorization: `Bearer ${token}` };
   assert.equal((await fetch(`${origin}/api/auth`, { headers })).status, 200);
+  const nativeOrigin = 'tauri://localhost';
+  const nativeAuth = await fetch(`${origin}/api/auth?token=${token}`, {
+    headers: { Origin: nativeOrigin },
+  });
+  assert.equal(nativeAuth.status, 200);
+  assert.equal(nativeAuth.headers.get('access-control-allow-origin'), nativeOrigin);
+  assert.equal((await nativeAuth.json()).ok, true);
+  const nativePreflight = await fetch(`${origin}/api/auth`, {
+    method: 'OPTIONS',
+    headers: {
+      Origin: nativeOrigin,
+      'Access-Control-Request-Method': 'GET',
+      'Access-Control-Request-Headers': 'authorization',
+    },
+  });
+  assert.equal(nativePreflight.status, 200);
+  assert.equal(nativePreflight.headers.get('access-control-allow-origin'), nativeOrigin);
   const init = await (await fetch(`${origin}/api/init`, { headers })).json();
   assert.equal(init.appVersion, '1.0.13');
   assert.equal(init.serverPlatform, 'linux');
   assert.equal(init.appDataDir, '/home/jean/.local/share/com.jean.desktop');
-  console.log(`HTTP/token/init: passed (Jean ${init.appVersion})`);
+  console.log(`HTTP/token/native-origin/init: passed (Jean ${init.appVersion})`);
   console.log('Container tools:', docker('exec', name, 'sh', '-c',
     'id; git --version; gh --version | head -1; node --version; npm --version; npx --version'));
 
@@ -165,6 +182,7 @@ try {
   if (created) {
     try { removeContainer(); } catch {}
   }
+  fixtureOwner(process.getuid(), process.getgid());
   rmSync(home, { recursive: true, force: true });
 }
 JS

@@ -4,8 +4,7 @@ on:
   push:
     branches: [master]
     paths:
-      - images/paseo/**
-      - .github/workflows/paseo-image.yml
+      - images/paseo/Dockerfile
   workflow_dispatch:
 
 permissions:

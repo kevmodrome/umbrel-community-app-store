@@ -4,8 +4,7 @@ on:
   push:
     branches: [master]
     paths:
-      - images/jean/**
-      - .github/workflows/jean-image.yml
+      - images/jean/Dockerfile
   workflow_dispatch:
 
 permissions:

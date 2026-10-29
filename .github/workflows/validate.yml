@@ -1,0 +1,77 @@
+name: Validate Umbrel apps
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - kevmodrome-jean/**
+      - kevmodrome-paseo/**
+      - images/jean/**
+      - images/paseo/smoke-test.sh
+      - .github/workflows/validate.yml
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Check out community apps
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Check out official validation tools and app port catalogue
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: getumbrel/umbrel-apps
+          ref: 1d6fc989fdc5686b23a374dc619d96f23300d359
+          path: .umbrel-lint
+          persist-credentials: false
+          sparse-checkout-cone-mode: false
+          sparse-checkout: |
+            /package.json
+            /package-lock.json
+            /.tools/lint-apps.mjs
+            /.tools/lint-apps.test.mjs
+            /*/umbrel-app.yml
+            /*/docker-compose.yml
+            /*/exports.sh
+
+      - name: Set up Node.js for validation
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: .umbrel-lint/package-lock.json
+
+      - name: Install validation dependency
+        working-directory: .umbrel-lint
+        run: npm ci --ignore-scripts
+
+      - name: Lint metadata, ports, persistence and public image pins
+        run: |
+          cp -a kevmodrome-jean kevmodrome-paseo .umbrel-lint/
+          npm --prefix .umbrel-lint run lint:apps -- kevmodrome-jean kevmodrome-paseo --check-images --format github
+
+      - name: Check Compose configuration
+        env:
+          APP_DATA_DIR: /tmp/umbrel-app-validation
+          APP_PASSWORD: ci-validation-placeholder
+          DEVICE_DOMAIN_NAME: umbrel.local
+          DEVICE_HOSTNAME: umbrel
+        run: |
+          docker compose -f kevmodrome-jean/docker-compose.yml config --no-consistency --quiet
+          docker compose -f kevmodrome-paseo/docker-compose.yml config --no-consistency --quiet
+
+      - name: Check server startup, authentication and persistence
+        run: |
+          for app in jean paseo; do
+            image="$(node -e 'const fs=require("node:fs"); const YAML=require("./.umbrel-lint/node_modules/yaml"); process.stdout.write(YAML.parse(fs.readFileSync(process.argv[1],"utf8")).services.server.image)' "kevmodrome-$app/docker-compose.yml")"
+            docker pull "$image"
+            bash "images/$app/smoke-test.sh" "$image"
+          done

@@ -1,0 +1,59 @@
+manifestVersion: 1
+id: kevmodrome-jean
+storage:
+  dataRoot: data
+folderAccess:
+  - id: projects
+    name: Projects
+    note: Select a folder of repositories to work on in Jean at /home/jean/projects.
+    mounts:
+      - service: server
+        targetPath: /home/jean/projects
+        readOnly: false
+category: developer
+name: Jean
+version: "1.0.13"
+tagline: Run AI coding agents on your Umbrel
+description: >-
+  Connect your Jean desktop app to this headless server. In the desktop app,
+  open the title-bar server picker, choose Add remote and Existing URL, and
+  enter http://umbrel.local:13456 with the app password shown by Umbrel as the
+  access token. Use your device hostname or IP if different. No username is
+  needed. Git, Node.js and npm are included. For Codex, use Full access with
+  trusted project folders; sandboxed modes can be blocked by Docker.
+
+
+  Jean is a development environment for AI coding agents. Work with Claude,
+  Codex and other supported backends, organize repositories and Git worktrees,
+  review changes, and use terminals from the Jean desktop app. Agents and
+  commands run on your Umbrel inside the Jean container. Select the remote
+  server before installing an agent CLI and signing in to your provider.
+
+
+  Your projects, worktrees, settings and CLI sign-ins are saved across app
+  restarts and updates. Create or clone projects under /home/jean/projects,
+  or select your own Projects folder in the app's Umbrel settings on umbrelOS 2.0.
+
+
+  Agent downloads and provider sign-in require internet access. Provider accounts
+  or API keys are supplied by you. This package includes Git, SSH, GitHub CLI,
+  Node.js 22 and npm. Chromium and project-specific build tools are not included.
+releaseNotes: ""
+
+developer: coolLabs
+website: https://jean.build
+dependencies: []
+repo: https://github.com/coollabsio/jean
+support: https://github.com/coollabsio/jean/issues
+
+port: 13456
+icon: https://raw.githubusercontent.com/coollabsio/jean/v1.0.13/public/logo.png
+gallery: []
+path: "/healthz"
+
+defaultUsername: ""
+defaultPassword: ""
+deterministicPassword: true
+
+submitter: kevmodrome
+submission: https://github.com/kevmodrome/umbrel-community-app-store

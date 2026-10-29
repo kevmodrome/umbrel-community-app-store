@@ -1,0 +1,52 @@
+manifestVersion: 1
+id: kevmodrome-paseo
+storage:
+  dataRoot: data
+folderAccess:
+  - id: projects
+    name: Projects
+    note: Select a folder for Paseo and its coding agents to read and edit. It appears at /workspace and replaces the app's default projects folder.
+    mounts:
+      - service: server
+        targetPath: /workspace
+        readOnly: false
+category: developer
+name: Paseo
+version: "0.14.0"
+tagline: Connect desktop and mobile coding agents
+description: >-
+  Run the Paseo server on your Umbrel and connect from Paseo's desktop or mobile app. In the client, choose Settings, Add host, Direct connection. Set Host to your Umbrel's hostname or IP address without a URL scheme or port, and set Port to 16767. Enable Use SSL for an HTTPS endpoint and leave it disabled for HTTP on your local network or VPN. Enter the app password shown by Umbrel; there is no username. HTTPS requires a certificate trusted by the client device.
+
+
+  Codex and Claude Code are included; sign in to your provider from the desktop or mobile client's built-in terminal before starting an agent. A supported provider account or API access is required.
+
+
+  If Codex reports a Linux sandbox or namespace permission error, select Full Access in the agent's permissions menu. This allows commands without additional Codex approval prompts inside the app's Docker container.
+
+
+  Paseo brings coding agents, projects, worktrees, terminals, file editing, and diffs to its desktop and mobile clients. Agents execute inside this app's container on your Umbrel.
+
+
+  Projects are stored in /workspace by default. You can select your own Projects folder in the Umbrel app settings. Paseo state, agent sign-ins, and configuration persist across app restarts and updates. Agents can read and edit the selected projects and use the credentials you configure inside the app.
+
+
+  The server runs headlessly with its web UI and outbound relay disabled. Opening the app from Umbrel shows a health status response; use a Paseo desktop or mobile client for your projects and agents.
+releaseNotes: ""
+
+developer: Paseo
+website: https://paseo.sh
+dependencies: []
+repo: https://github.com/getpaseo/paseo
+support: https://github.com/getpaseo/paseo/issues
+
+port: 16767
+gallery: []
+path: /api/health
+icon: https://raw.githubusercontent.com/getpaseo/paseo/v0.14.0/packages/app/public/pwa-icon-512.png
+
+defaultUsername: ""
+defaultPassword: ""
+deterministicPassword: true
+
+submitter: kevmodrome
+submission: https://github.com/kevmodrome/umbrel-community-app-store

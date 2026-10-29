@@ -1,0 +1,20 @@
+services:
+  app_proxy:
+    environment:
+      APP_HOST: kevmodrome-paseo_server_1
+      APP_PORT: 6767
+      # Native clients authenticate with Paseo's password, without Umbrel cookies.
+      PROXY_AUTH_WHITELIST: "/api/*,/ws"
+
+  server:
+    image: ghcr.io/kevmodrome/umbrel-paseo:0.14.0-1@sha256:b49123c70105742c5d044c54098076faa928e3d4d0a5cf6a3b0ec2a9aa8cdd6f
+    restart: on-failure
+    environment:
+      PASEO_PASSWORD: ${APP_PASSWORD}
+      PASEO_HOSTNAMES: ${DEVICE_DOMAIN_NAME},${DEVICE_HOSTNAME}
+      PASEO_RELAY_ENABLED: "false"
+      PASEO_LISTEN: 0.0.0.0:6767
+      PASEO_WEB_UI_ENABLED: "false"
+    volumes:
+      - ${APP_DATA_DIR}/data/home:/home/paseo
+      - ${APP_DATA_DIR}/data/workspace:/workspace

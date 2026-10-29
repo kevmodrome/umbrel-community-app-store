@@ -1,0 +1,25 @@
+services:
+  app_proxy:
+    environment:
+      APP_HOST: kevmodrome-jean_server_1
+      APP_PORT: 3456
+      # Native Jean clients use their access token instead of an Umbrel cookie.
+      PROXY_AUTH_WHITELIST: "/api/*,/ws"
+
+  server:
+    image: ghcr.io/kevmodrome/umbrel-jean:1.0.13-1@sha256:c5c0f0b55e2e59950bfd718f395774d834ef3228594813c7e726c0076f0494b0
+    restart: on-failure
+    init: true
+    environment:
+      JEAN_HEADLESS: "1"
+      JEAN_HOST: 0.0.0.0
+      JEAN_PORT: "3456"
+      JEAN_TOKEN: ${APP_PASSWORD}
+    volumes:
+      - ${APP_DATA_DIR}/data/home:/home/jean
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://127.0.0.1:3456/readyz"]
+      interval: 30s
+      timeout: 5s
+      start_period: 30s
+      retries: 3

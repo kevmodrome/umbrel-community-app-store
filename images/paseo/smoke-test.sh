@@ -42,6 +42,7 @@ start() {
     -e PASEO_PASSWORD=smoke-test-only-password \
     -e PASEO_HOSTNAMES=smoke.local \
     -e PASEO_RELAY_ENABLED=false \
+    -e PASEO_WEB_UI_ENABLED=false \
     -v "$home_volume:/home/paseo" -v "$workspace_volume:/workspace" \
     "$image" >/dev/null
 
@@ -80,7 +81,7 @@ docker exec "$name" sh -ec '
   test -n "$pid"
   test "$(ps -o uid= -p "$pid" | tr -d " ")" = 1000
 '
-stage 'verify browser UI, HTTP password, and hostname validation'
+stage 'verify headless HTTP API, password, and hostname validation'
 docker exec -i "$name" node <<'NODE'
 const assert = require('node:assert/strict');
 const http = require('node:http');
@@ -98,22 +99,32 @@ function get(path, host, token) {
   });
 }
 (async () => {
-  const ui = await get('/', 'smoke.local');
-  assert.equal(ui.status, 200, 'bundled browser UI');
-  assert.match(ui.body, /<html/i, 'browser UI contains HTML');
+  assert.equal((await get('/api/health', 'smoke.local')).status, 200, 'headless health endpoint');
+  assert.equal((await get('/', 'smoke.local', process.env.PASEO_PASSWORD)).status, 404, 'bundled browser UI disabled');
   assert.equal((await get('/api/status', 'smoke.local')).status, 401, 'password required');
   assert.equal((await get('/api/status', 'smoke.local', 'wrong-password')).status, 401, 'wrong password rejected');
   assert.equal((await get('/api/status', 'smoke.local', process.env.PASEO_PASSWORD)).status, 200, 'configured password accepted');
   assert.equal((await get('/api/health', 'untrusted.invalid')).status, 403, 'unknown hostname rejected');
 })().catch(error => { console.error(error); process.exitCode = 1; });
 NODE
-# Use Paseo's own client protocol to exercise the authenticated WebSocket path.
-stage 'connect authenticated Paseo WebSocket client'
+# Isolate client state so the same-user local credential cannot bypass passwords.
+stage 'verify native WebSocket client missing, wrong, and valid passwords'
 docker exec --user paseo "$name" node -e '
+  const assert = require("node:assert/strict");
   const { spawnSync } = require("node:child_process");
-  const result = spawnSync("paseo", ["project", "ls", "--host", "127.0.0.1:6767"], { stdio: "inherit", timeout: 20000 });
-  if (result.error) console.error(result.error);
-  process.exit(result.status === 0 ? 0 : 1);
+  for (const password of [undefined, "wrong-password", process.env.PASEO_PASSWORD]) {
+    const env = { ...process.env, PASEO_HOME: "/tmp/paseo-smoke-isolated-client" };
+    if (password === undefined) delete env.PASEO_PASSWORD;
+    else env.PASEO_PASSWORD = password;
+    const result = spawnSync("paseo", ["project", "ls", "--host", "127.0.0.1:6767"], { env, encoding: "utf8", timeout: 20000 });
+    assert.ifError(result.error);
+    if (password === process.env.PASEO_PASSWORD) {
+      assert.equal(result.status, 0, result.stderr);
+    } else {
+      assert.notEqual(result.status, 0, "native client must reject missing/wrong password");
+      assert.match(result.stderr, /password|unauthorized/i, "native client authentication rejection");
+    }
+  }
 '
 
 stage 'replace container and verify persistent files'
@@ -123,4 +134,4 @@ docker exec --user paseo "$name" sh -ec '
   test "$(cat "$HOME/smoke-persistence")" = retained
   test "$(cat /workspace/smoke-persistence)" = retained
 '
-printf '%s\n' 'Paseo smoke checks passed: browser UI, health, password, host allowlist, non-root agents, and persistence.'
+printf '%s\n' 'Paseo smoke checks passed: headless API, HTTP/WebSocket passwords, host allowlist, non-root agents, and persistence.'
