@@ -7,7 +7,7 @@ services:
       PROXY_AUTH_WHITELIST: "/api/*,/ws"
 
   server:
-    image: ghcr.io/kevmodrome/umbrel-jean:1.0.13-1@sha256:c5c0f0b55e2e59950bfd718f395774d834ef3228594813c7e726c0076f0494b0
+    image: ghcr.io/kevmodrome/umbrel-jean:1.0.13-1@sha256:8d205a9e535830009997936bbc7cc4b2abfb6841cdea4e298b629c1228a0c282
     restart: on-failure
     init: true
     environment:
