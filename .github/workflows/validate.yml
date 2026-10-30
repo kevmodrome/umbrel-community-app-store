@@ -6,8 +6,10 @@ on:
     paths:
       - kevmodrome-jean/**
       - kevmodrome-paseo/**
+      - kevmodrome-happier/**
       - images/jean/**
       - images/paseo/smoke-test.sh
+      - images/happier/**
       - .github/workflows/validate.yml
   pull_request:
   workflow_dispatch:
@@ -55,8 +57,8 @@ jobs:
 
       - name: Lint metadata, ports, persistence and public image pins
         run: |
-          cp -a kevmodrome-jean kevmodrome-paseo .umbrel-lint/
-          npm --prefix .umbrel-lint run lint:apps -- kevmodrome-jean kevmodrome-paseo --check-images --format github
+          cp -a kevmodrome-jean kevmodrome-paseo kevmodrome-happier .umbrel-lint/
+          npm --prefix .umbrel-lint run lint:apps -- kevmodrome-jean kevmodrome-paseo kevmodrome-happier --check-images --format github
 
       - name: Check Compose configuration
         env:
@@ -67,6 +69,7 @@ jobs:
         run: |
           docker compose -f kevmodrome-jean/docker-compose.yml config --no-consistency --quiet
           docker compose -f kevmodrome-paseo/docker-compose.yml config --no-consistency --quiet
+          docker compose -f kevmodrome-happier/docker-compose.yml config --no-consistency --quiet
 
       - name: Check server startup, authentication and persistence
         run: |
@@ -75,3 +78,13 @@ jobs:
             docker pull "$image"
             bash "images/$app/smoke-test.sh" "$image"
           done
+
+      - name: Check Happier native pairing, remote commands and persistence
+        run: |
+          runner="$(node -e 'const fs=require("node:fs"); const YAML=require("./.umbrel-lint/node_modules/yaml"); process.stdout.write(YAML.parse(fs.readFileSync("kevmodrome-happier/docker-compose.yml","utf8")).services.runner.image)')"
+          relay="$(node -e 'const fs=require("node:fs"); const YAML=require("./.umbrel-lint/node_modules/yaml"); process.stdout.write(YAML.parse(fs.readFileSync("kevmodrome-happier/docker-compose.yml","utf8")).services.relay.image)')"
+          docker pull "$runner"
+          docker pull "$relay"
+          HAPPIER_TEST_IMAGE="$runner" bash images/happier/smoke-test.sh
+          npm ci --ignore-scripts --no-audit --no-fund --prefix images/happier/tests
+          bash images/happier/integration-smoke.sh "$runner" "$relay"

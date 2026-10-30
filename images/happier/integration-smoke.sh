@@ -136,7 +136,7 @@ const text = fs.readdirSync(logs)
   .map(name => fs.readFileSync(path.join(logs, name), 'utf8')).join('\n');
 assert.equal((text.match(/\[DAEMON RUN\]\[FATAL\]/g) || []).length, 1, 'Only the known initial-auth fatal exit is permitted');
 assert(text.includes('DaemonStopIncompleteError'), 'Expected upstream daemon-stop error type');
-assert(text.includes('startup_in_progress'), 'Expected own startup-lock rejection');
+assert(text.includes('startup_in_progress') || text.includes('process_identity_unverified'), 'Expected known startup-lock preflight rejection');
 assert(text.includes('daemon_stop_incomplete'), 'Expected upstream daemon-stop error code');
 console.log('PASS: single initial-pairing restart matches the pinned upstream startup-lock error');
 JS

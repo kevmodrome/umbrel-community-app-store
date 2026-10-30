@@ -39,7 +39,7 @@ services:
       retries: 3
 
   runner:
-    image: ghcr.io/kevmodrome/umbrel-happier:stable-a2c45c86804b-1
+    image: ghcr.io/kevmodrome/umbrel-happier:stable-a2c45c86804b-1@sha256:1b9ed0753e8551f5acc152f72326aebc98204d7081f83017376e0d8386abf8d8
     restart: on-failure
     init: true
     environment:

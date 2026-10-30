@@ -1,0 +1,73 @@
+manifestVersion: 1
+id: kevmodrome-happier
+storage:
+  dataRoot: data
+environment:
+  - name: HAPPIER_PUBLIC_SERVER_URL
+    services:
+      - relay
+      - runner
+    note: Canonical relay URL used by your native clients and pairing links. Include http:// or https:// and the port. Set a reachable address before pairing a machine.
+folderAccess:
+  - id: projects
+    name: Projects
+    note: Select a folder for Happier and its coding agents to read and edit. It appears at /workspace and replaces the app's default projects folder.
+    mounts:
+      - service: runner
+        targetPath: /workspace
+        readOnly: false
+category: developer
+name: Happier
+version: "stable-a2c45c86804b"
+tagline: Control coding agents from desktop and mobile
+description: >-
+  Run a private Happier relay and an always-on coding machine on your Umbrel.
+  Connect from Happier's native desktop or mobile app: open Settings, Server,
+  Add Relay and enter http://umbrel.local:13005, using your Umbrel's hostname
+  or IP if different. Create or restore your Happier account on that server.
+  There is no app password or username.
+
+
+  Pair the Umbrel machine once from Umbrel's Open Terminal for this app's
+  runner service. Run happier auth login --no-open --method mobile --no-daemon-start,
+  then scan the QR code or open the native app link and approve with your
+  Happier account. The runner becomes available automatically after approval.
+  Choose an address that every client can reach before pairing; the public URL
+  environment setting can override the default LAN hostname.
+
+
+  Codex and Claude Code are included. After pairing, use Happier's terminal or
+  provider settings to sign into a supported coding provider on the Umbrel
+  machine. A provider account or API access is required. Projects, terminals
+  and agents run inside the app's runner container on your Umbrel.
+
+
+  Projects live in /workspace by default. Select an optional Projects folder
+  in Umbrel's app settings to work on existing storage. The entire runner home,
+  default workspace and relay data persist across app restarts and updates,
+  including machine pairing, provider sign-ins and encrypted session history.
+
+
+  This package is headless: its browser UI is disabled. Opening it from Umbrel
+  shows relay health; use a native client for projects and agents. By default,
+  anyone who can reach the relay may create a separate device-key account.
+  Keep the endpoint on your LAN or VPN. Use a reachable HTTPS endpoint with a
+  trusted certificate for remote access, and preserve WebSocket support.
+releaseNotes: ""
+
+developer: Happier
+website: https://happier.dev
+dependencies: []
+repo: https://github.com/happier-dev/happier
+support: https://github.com/happier-dev/happier/issues
+
+port: 13005
+icon: https://raw.githubusercontent.com/happier-dev/happier/a2c45c86804b24e60ac0b76146a3ef36dfcaa15b/apps/ui/public/icons/icon-512.png
+gallery: []
+path: /health
+
+defaultUsername: ""
+defaultPassword: ""
+
+submitter: kevmodrome
+submission: https://github.com/kevmodrome/umbrel-community-app-store
