@@ -1,0 +1,16 @@
+{
+  "name": "happier-umbrel-protocol-smoke",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Synthetic native-client black-box test for the pinned Happier relay and daemon package",
+  "scripts": {
+    "smoke": "node protocol-smoke.cjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "socket.io-client": "4.8.1",
+    "tweetnacl": "1.0.3"
+  }
+}

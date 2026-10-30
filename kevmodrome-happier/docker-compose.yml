@@ -1,0 +1,59 @@
+services:
+  app_proxy:
+    environment:
+      APP_HOST: kevmodrome-happier_relay_1
+      APP_PORT: 3005
+      # Native clients use Happier device keys and tokens, not Umbrel cookies.
+      PROXY_AUTH_WHITELIST: "/v1/*,/v2/*,/v3/*,/files/*,/health,/ready"
+
+  relay:
+    image: happierdev/relay-server:stable-a2c45c86804b@sha256:3f6068f9659980c7cc34456ff844b6bad9e127c18a6642690299dea1e1e4186e
+    restart: on-failure
+    init: true
+    environment:
+      PORT: "3005"
+      HAPPIER_SERVER_HOST: 0.0.0.0
+      HAPPIER_SERVER_FLAVOR: light
+      HAPPIER_DB_PROVIDER: sqlite
+      HAPPIER_FILES_BACKEND: local
+      HAPPIER_SERVER_LIGHT_DATA_DIR: /data
+      HAPPIER_SOCKET_ADAPTER: memory
+      SERVER_ROLE: all
+      HAPPIER_SERVER_UI_DIR: ""
+      HAPPIER_SERVER_UI_REQUIRED: "0"
+      HAPPIER_PUBLIC_SERVER_URL: http://${DEVICE_DOMAIN_NAME}:13005
+      AUTH_ANONYMOUS_SIGNUP_ENABLED: "true"
+      HAPPIER_FEATURE_ENCRYPTION__STORAGE_POLICY: required_e2ee
+    # Local public file URLs must follow the configurable canonical address.
+    command:
+      - /bin/sh
+      - -c
+      - export PUBLIC_URL="$$HAPPIER_PUBLIC_SERVER_URL"; exec run-server /opt/happier/server/happier-server
+    volumes:
+      - ${APP_DATA_DIR}/data/relay:/data
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "--max-time", "5", "http://127.0.0.1:3005/ready"]
+      interval: 30s
+      timeout: 10s
+      start_period: 60s
+      retries: 3
+
+  runner:
+    image: ghcr.io/kevmodrome/umbrel-happier:stable-a2c45c86804b-1
+    restart: on-failure
+    init: true
+    environment:
+      HOME: /home/happier
+      HAPPIER_HOME_DIR: /home/happier/.happier
+      HAPPIER_SERVER_URL: http://${DEVICE_DOMAIN_NAME}:13005
+      HAPPIER_PUBLIC_SERVER_URL: http://${DEVICE_DOMAIN_NAME}:13005
+      HAPPIER_LOCAL_SERVER_URL: http://relay:3005
+      HAPPIER_DAEMON_WAIT_FOR_AUTH: "1"
+      HAPPIER_DAEMON_WAIT_FOR_AUTH_TIMEOUT_MS: "0"
+      HAPPIER_SESSION_AUTOSTART_DAEMON: "0"
+    volumes:
+      - ${APP_DATA_DIR}/data/home:/home/happier
+      - ${APP_DATA_DIR}/data/workspace:/workspace
+    depends_on:
+      relay:
+        condition: service_healthy
