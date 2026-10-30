@@ -350,7 +350,7 @@ async function verify() {
   assert.equal((await profile(renewedToken)).id, state.accountId, 'Account database must survive relay recreation');
   await assertSession(state);
   await remoteShell(state, { argv: ['cat', state.marker] });
-  console.log('PASS: recreated relay and runner preserve account, token, encrypted session, pairing, machine identity, and project file');
+  console.log('PASS: relay and runner preserve account, token, encrypted session, pairing, machine identity, and project file');
 }
 
 (phase === 'prepare' ? prepare() : verify()).catch(error => {

@@ -106,6 +106,7 @@ sleep 2
 test "$(docker inspect --format '{{.State.Running}}' "$runner_id")" = true
 unpaired_restarts="$(docker inspect --format '{{.RestartCount}}' "$runner_id")"
 printf 'Runner restarts before pairing: %s\n' "$unpaired_restarts"
+test "$unpaired_restarts" = 0
 logs="$(docker logs "$runner_id" 2>&1)"
 if printf '%s\n' "$logs" | grep -E 'happier://|/terminal/connect|claimSecret' >/dev/null; then
   echo "Runner startup must not log pairing credentials." >&2
@@ -117,7 +118,35 @@ master_before="$(docker exec "$relay_id" sha256sum /data/handy-master-secret.txt
 
 stage="pair through production CLI and execute encrypted native machine RPC"
 node "$script_dir/tests/protocol-smoke.cjs" prepare
-test "$(docker inspect --format '{{.RestartCount}}' "$runner_id")" = "$unpaired_restarts"
+paired_restarts="$(docker inspect --format '{{.RestartCount}}' "$runner_id")"
+case "$paired_restarts" in
+  0) ;;
+  1)
+    # Pinned upstream's auth wait retains its startup lock. Its own stopDaemon
+    # preflight rejects that lock once; restart:on-failure recovers with saved
+    # credentials. Accept only this exact first-pairing failure, never a generic
+    # crash or a restart loop. Already-paired starts do not take the waiting lock.
+    docker exec -i "$runner_id" node --input-type=module <<'JS'
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+const logs = path.join(process.env.HAPPIER_HOME_DIR, 'logs');
+const text = fs.readdirSync(logs)
+  .filter(name => name.endsWith('-daemon.log'))
+  .map(name => fs.readFileSync(path.join(logs, name), 'utf8')).join('\n');
+assert.equal((text.match(/\[DAEMON RUN\]\[FATAL\]/g) || []).length, 1, 'Only the known initial-auth fatal exit is permitted');
+assert(text.includes('DaemonStopIncompleteError'), 'Expected upstream daemon-stop error type');
+assert(text.includes('startup_in_progress'), 'Expected own startup-lock rejection');
+assert(text.includes('daemon_stop_incomplete'), 'Expected upstream daemon-stop error code');
+console.log('PASS: single initial-pairing restart matches the pinned upstream startup-lock error');
+JS
+    ;;
+  *) echo "Unexpected runner restarts after pairing." >&2; exit 1 ;;
+esac
+stage="verify stable paired daemon and repeated encrypted remote command"
+sleep 3
+node "$script_dir/tests/protocol-smoke.cjs" verify
+test "$(docker inspect --format '{{.RestartCount}}' "$runner_id")" = "$paired_restarts"
 
 stage="replace both containers while retaining app data"
 compose up --detach --force-recreate --wait --wait-timeout 120 relay runner
@@ -130,5 +159,6 @@ test "$(docker exec "$relay_id" sha256sum /data/handy-master-secret.txt)" = "$ma
 test "$(docker exec "$runner_id" sh -c 'cat "$HOME/.provider-persistence-marker"')" = synthetic-provider-state
 stage="verify original account, encrypted session, machine identity and workspace"
 node "$script_dir/tests/protocol-smoke.cjs" verify
+test "$(docker inspect --format '{{.RestartCount}}' "$runner_id")" = 0
 printf 'PASS: native pairing, encrypted project command, relay identity and container-replacement persistence.\n'
 
