@@ -53,6 +53,9 @@ finish() {
   result=$?
   if [ "$result" -ne 0 ]; then
     printf 'Happier integration failed during: %s\n' "$stage" >&2
+    if [ -n "${runner_id:-}" ]; then
+      docker inspect --format 'Runner state: running={{.State.Running}} restarts={{.RestartCount}} exitCode={{.State.ExitCode}} startedAt={{.State.StartedAt}}' "$runner_id" >&2 || true
+    fi
     compose logs --no-color --tail 100 relay runner >&2 || true
   fi
   compose down --volumes --remove-orphans >/dev/null 2>&1 || true
@@ -101,6 +104,8 @@ JS
 stage="prove unpaired runner stays up without exposing pairing secrets"
 sleep 2
 test "$(docker inspect --format '{{.State.Running}}' "$runner_id")" = true
+unpaired_restarts="$(docker inspect --format '{{.RestartCount}}' "$runner_id")"
+printf 'Runner restarts before pairing: %s\n' "$unpaired_restarts"
 logs="$(docker logs "$runner_id" 2>&1)"
 if printf '%s\n' "$logs" | grep -E 'happier://|/terminal/connect|claimSecret' >/dev/null; then
   echo "Runner startup must not log pairing credentials." >&2
@@ -112,6 +117,7 @@ master_before="$(docker exec "$relay_id" sha256sum /data/handy-master-secret.txt
 
 stage="pair through production CLI and execute encrypted native machine RPC"
 node "$script_dir/tests/protocol-smoke.cjs" prepare
+test "$(docker inspect --format '{{.RestartCount}}' "$runner_id")" = "$unpaired_restarts"
 
 stage="replace both containers while retaining app data"
 compose up --detach --force-recreate --wait --wait-timeout 120 relay runner

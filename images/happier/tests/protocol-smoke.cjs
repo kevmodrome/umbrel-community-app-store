@@ -47,6 +47,35 @@ function required(name) {
 const b64 = value => Buffer.from(value).toString('base64');
 const unb64 = value => new Uint8Array(Buffer.from(value, 'base64'));
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms));
+let lastTargetDiagnostic;
+
+function describeTargetResult(result) {
+  const type = result === null ? 'null' : Array.isArray(result) ? 'array' : typeof result;
+  if (type !== 'object') return { type };
+  const fields = ['success', 'stdout', 'stderr', 'exitCode', 'error', 'errorCode', 'code', 'v', 'ok', 'result', 'details', 'acknowledgement', 'type', 'message'];
+  const keys = Object.keys(result);
+  const classify = value => {
+    if (typeof value !== 'string') return value === undefined ? 'absent' : typeof value;
+    const prefixes = [
+      ['Command failed', 'command_failed'], ['Command timed out', 'command_timeout'],
+      ['Access denied:', 'path_access_denied'], ['Path is required', 'path_required'],
+      ['Path contains invalid characters', 'path_invalid'], ['Invalid RPC params', 'rpc_params_invalid'],
+      ['Method not found', 'method_not_found'], ['RPC method not available', 'method_unavailable'],
+      ['Forbidden', 'forbidden'], ['spawn sh ENOENT', 'shell_not_found'],
+      ['spawn cat ENOENT', 'cat_not_found'], ['spawn sh EACCES', 'shell_access_denied'],
+      ['mkdir:', 'mkdir_error'], ['cat:', 'cat_error'], ['sh:', 'shell_error'],
+    ];
+    return prefixes.find(([prefix]) => value.startsWith(prefix))?.[1] || (value.length ? 'unrecognized' : 'empty');
+  };
+  const knownCodes = ['RPC_METHOD_NOT_AVAILABLE', 'RPC_METHOD_NOT_FOUND', 'RPC_FORBIDDEN', 'RPC_SESSION_MACHINE_CONTROL_UNAVAILABLE', 'MACHINE_RPC_ENCRYPTION_ERROR', 'ENOENT', 'EACCES', 'ETIMEDOUT'];
+  return {
+    type, keys: fields.filter(key => keys.includes(key)), unknownKeys: keys.filter(key => !fields.includes(key)).length,
+    success: typeof result.success === 'boolean' ? result.success : typeof result.success,
+    exitCode: typeof result.exitCode === 'number' ? result.exitCode : typeof result.exitCode,
+    errorCode: knownCodes.includes(result.errorCode) ? result.errorCode : typeof result.errorCode,
+    error: classify(result.error), stderr: classify(result.stderr), stdoutType: typeof result.stdout,
+  };
+}
 
 async function request(route, { token, body, ...options } = {}) {
   const response = await fetch(`${base}${route}`, {
@@ -169,7 +198,16 @@ function decryptRpc(encoded, key) {
   assert(bundle.length >= 29 && bundle[0] === 0, 'AES-GCM v0 result');
   const decipher = crypto.createDecipheriv('aes-256-gcm', key, bundle.subarray(1, 13));
   decipher.setAuthTag(bundle.subarray(-16));
-  return JSON.parse(Buffer.concat([decipher.update(bundle.subarray(13, -16)), decipher.final()]).toString('utf8'));
+  const serialized = Buffer.concat([decipher.update(bundle.subarray(13, -16)), decipher.final()]).toString('utf8');
+  if (serialized === 'undefined') return undefined;
+  const parsed = JSON.parse(serialized);
+  // Released CLI encryption uses protocol stringifySerializedJsonValue. Accept
+  // legacy raw JSON too, as its production parseSerializedJsonValue does.
+  if (parsed && typeof parsed === 'object' && parsed.__happierSerializedJsonValueV1 === true) {
+    if (parsed.type === 'undefined') return undefined;
+    if (parsed.type === 'json' && Object.hasOwn(parsed, 'value')) return parsed.value;
+  }
+  return parsed;
 }
 
 function openPublishedMachineKey(encoded, provisionedKey) {
@@ -223,6 +261,9 @@ async function remoteShell(state, task) {
       });
       assert.equal(ack?.ok, true, 'Relay must route machine bash RPC');
       const result = decryptRpc(ack.result, key);
+      // Only fixed field names, primitive statuses, and known error categories.
+      // Never print raw target errors, stdout, stderr, encrypted params, or keys.
+      lastTargetDiagnostic = describeTargetResult(result);
       assert.equal(result?.success, true, 'Runner must execute the project task');
       assert.equal(result.exitCode, 0, 'Project task exit status');
       assert.equal(result.stdout, state.nonce, 'Project task output');
@@ -319,5 +360,6 @@ async function verify() {
     ? error.message.split('\n')[0]
     : error instanceof Error ? error.name : 'unknown error';
   console.error(`FAIL: ${phase}: ${label}`);
+  if (lastTargetDiagnostic) console.error(`Target result diagnostic: ${JSON.stringify(lastTargetDiagnostic)}`);
   process.exitCode = 1;
 });
