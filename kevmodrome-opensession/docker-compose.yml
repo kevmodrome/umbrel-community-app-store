@@ -1,0 +1,15 @@
+services:
+  app_proxy:
+    environment:
+      APP_HOST: kevmodrome-opensession_server_1
+      APP_PORT: 3850
+
+  server:
+    image: ghcr.io/kevmodrome/umbrel-opensession:0.4.79-1@sha256:c7144dbcdc4408626fd6f661df513a97d5fbf50f4db1feccd04e3be43d97465a
+    restart: on-failure
+    stop_grace_period: 30s
+    environment:
+      OPENSESSION_UI_BASE: http://${DEVICE_DOMAIN_NAME}:13850
+    volumes:
+      - ${APP_DATA_DIR}/data/home:/home/opensession
+      - ${APP_DATA_DIR}/data/workspace:/workspace

@@ -1,0 +1,61 @@
+manifestVersion: 1
+id: kevmodrome-opensession
+storage:
+  dataRoot: data
+environment:
+  - name: OPENSESSION_UI_BASE
+    services:
+      - server
+    note: Browser-visible URL for generated links. Include http:// or https:// and the app port. Use a private address protected by Umbrel login.
+folderAccess:
+  - id: projects
+    name: Projects
+    note: Select a folder of repositories for Open Session to read and edit at /workspace. Git worktrees are created in /workspace/.worktrees.
+    mounts:
+      - service: server
+        targetPath: /workspace
+        readOnly: false
+category: developer
+name: Open Session
+version: "0.4.79"
+tagline: A browser workspace for your coding agents
+description: >-
+  Run Open Session on your Umbrel and manage coding agents from your browser.
+  Open the app from Umbrel, complete the first-run walkthrough, and add your
+  ChatGPT subscription or a supported model API key under Workspace, Providers.
+  ChatGPT device-code sign-in works in the browser without SSH. Claude accounts
+  use a Claude Code setup token, supplied by you.
+
+
+  Create sessions in separate Git worktrees, steer agents, use built-in
+  terminals, review diffs and collaborate on your own projects. Codex CLI,
+  Claude Code, Git, GitHub CLI, Node.js, npm, Bun and basic build tools are
+  included. Connect your GitHub account in the app for private repositories
+  and pull requests. No provider credentials are included.
+
+
+  Projects live in /workspace. Select an optional Projects folder in Umbrel's
+  app settings to work on existing storage. Your entire app home, provider
+  sign-ins, sessions, default projects and worktrees persist across restarts
+  and updates.
+
+
+  Umbrel login protects the browser interface, API and WebSocket connections.
+  Use the browser interface for this package. Agents run inside the app
+  container with access to its mounted files and saved credentials. The
+  package does not provide host Docker access, public webhook ingress or
+  automatically publish project preview ports.
+releaseNotes: ""
+developer: Tella
+website: https://www.opensession.com
+dependencies: []
+repo: https://github.com/tellahq/opensession
+support: https://github.com/tellahq/opensession/issues
+port: 13850
+icon: https://raw.githubusercontent.com/tellahq/opensession/v0.4.79/packages/clients/mac/build/icon-512.png
+gallery: []
+path: "/"
+defaultUsername: ""
+defaultPassword: ""
+submitter: kevmodrome
+submission: https://github.com/kevmodrome/umbrel-community-app-store

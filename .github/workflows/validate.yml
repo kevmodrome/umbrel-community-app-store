@@ -7,9 +7,11 @@ on:
       - kevmodrome-jean/**
       - kevmodrome-paseo/**
       - kevmodrome-happier/**
+      - kevmodrome-opensession/**
       - images/jean/**
       - images/paseo/smoke-test.sh
       - images/happier/**
+      - images/opensession/**
       - .github/workflows/validate.yml
   pull_request:
   workflow_dispatch:
@@ -57,8 +59,8 @@ jobs:
 
       - name: Lint metadata, ports, persistence and public image pins
         run: |
-          cp -a kevmodrome-jean kevmodrome-paseo kevmodrome-happier .umbrel-lint/
-          npm --prefix .umbrel-lint run lint:apps -- kevmodrome-jean kevmodrome-paseo kevmodrome-happier --check-images --format github
+          cp -a kevmodrome-jean kevmodrome-paseo kevmodrome-happier kevmodrome-opensession .umbrel-lint/
+          npm --prefix .umbrel-lint run lint:apps -- kevmodrome-jean kevmodrome-paseo kevmodrome-happier kevmodrome-opensession --check-images --format github
 
       - name: Check Compose configuration
         env:
@@ -70,6 +72,7 @@ jobs:
           docker compose -f kevmodrome-jean/docker-compose.yml config --no-consistency --quiet
           docker compose -f kevmodrome-paseo/docker-compose.yml config --no-consistency --quiet
           docker compose -f kevmodrome-happier/docker-compose.yml config --no-consistency --quiet
+          docker compose -f kevmodrome-opensession/docker-compose.yml config --no-consistency --quiet
 
       - name: Check server startup, authentication and persistence
         run: |
@@ -88,3 +91,9 @@ jobs:
           HAPPIER_TEST_IMAGE="$runner" bash images/happier/smoke-test.sh
           npm ci --ignore-scripts --no-audit --no-fund --prefix images/happier/tests
           bash images/happier/integration-smoke.sh "$runner" "$relay"
+
+      - name: Check Open Session browser startup and persistence
+        run: |
+          image="$(node -e 'const fs=require("node:fs"); const YAML=require("./.umbrel-lint/node_modules/yaml"); process.stdout.write(YAML.parse(fs.readFileSync("kevmodrome-opensession/docker-compose.yml","utf8")).services.server.image)')"
+          docker pull "$image"
+          bash images/opensession/smoke-test.sh "$image"
