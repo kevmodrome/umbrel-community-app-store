@@ -17,7 +17,7 @@ folderAccess:
         readOnly: false
 category: developer
 name: Open Session
-version: "0.4.79"
+version: "0.4.82"
 tagline: A browser workspace for your coding agents
 description: >-
   Run Open Session on your Umbrel and manage coding agents from your browser.
@@ -45,14 +45,14 @@ description: >-
   container with access to its mounted files and saved credentials. The
   package does not provide host Docker access, public webhook ingress or
   automatically publish project preview ports.
-releaseNotes: ""
+releaseNotes: "Update Open Session to 0.4.82."
 developer: Tella
 website: https://www.opensession.com
 dependencies: []
 repo: https://github.com/tellahq/opensession
 support: https://github.com/tellahq/opensession/issues
 port: 13850
-icon: https://raw.githubusercontent.com/tellahq/opensession/v0.4.79/packages/clients/mac/build/icon-512.png
+icon: https://raw.githubusercontent.com/tellahq/opensession/v0.4.82/packages/clients/mac/build/icon-512.png
 gallery: []
 path: "/"
 defaultUsername: ""

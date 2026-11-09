@@ -5,7 +5,7 @@ services:
       APP_PORT: 3850
 
   server:
-    image: ghcr.io/kevmodrome/umbrel-opensession:0.4.79-1@sha256:c7144dbcdc4408626fd6f661df513a97d5fbf50f4db1feccd04e3be43d97465a
+    image: ghcr.io/kevmodrome/umbrel-opensession:0.4.82-1@sha256:b037551f489791a8651eb5e1f5b038228985f5637c57e6e0a5fdefee6ff11519
     restart: on-failure
     stop_grace_period: 30s
     environment:
