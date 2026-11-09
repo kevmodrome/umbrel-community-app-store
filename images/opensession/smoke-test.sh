@@ -17,15 +17,16 @@ const home = join(root, 'home');
 const workspace = join(root, 'workspace');
 mkdirSync(home); mkdirSync(workspace);
 const image = process.env.OPENSESSION_SMOKE_IMAGE;
+const seedImage = process.env.OPENSESSION_SMOKE_SEED_IMAGE || image;
 const name = `opensession-smoke-${process.pid}`;
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8' }).trim();
 let created = false;
 let socket;
-async function start() {
+async function start(reference = image) {
   docker('run', '--detach', '--name', name,
     '--env', 'OPENSESSION_UI_BASE=http://umbrel.local:13850',
     '--publish', '127.0.0.1::3850',
-    '--volume', `${home}:/home/opensession`, '--volume', `${workspace}:/workspace`, image);
+    '--volume', `${home}:/home/opensession`, '--volume', `${workspace}:/workspace`, reference);
   created = true;
   const origin = `http://${docker('port', name, '3850/tcp')}`;
   for (let attempt = 0; attempt < 120; attempt++) {
@@ -40,9 +41,15 @@ function remove() {
   created = false;
 }
 const inside = code => docker('exec', '--user', '1000:1000', name, 'node', '--input-type=module', '-e', code);
+function checkVersion(reference) {
+  const label = docker('image', 'inspect', '--format', '{{index .Config.Labels "org.opencontainers.image.version"}}', reference);
+  const release = inside(`import fs from 'node:fs'; console.log(JSON.parse(fs.readFileSync('/opt/opensession/release.json')).version);`);
+  assert.equal(release.replace(/^v/, ''), label.replace(/-\d+$/, ''), 'release archive does not match image version');
+}
 
 try {
-  let origin = await start();
+  let origin = await start(seedImage);
+  checkVersion(seedImage);
   assert.equal((await fetch(origin)).status, 200);
   assert.equal((await (await fetch(`${origin}/api/health?brief=1`)).json()).ok, true);
   assert.equal((await (await fetch(`${origin}/api/setup/onboarding`)).json()).completed, false);
@@ -105,6 +112,16 @@ try {
 
   remove();
   origin = await start();
+  checkVersion(image);
+  if (process.env.OPENSESSION_SMOKE_CODEMODE === '1') {
+    inside(`import fs from 'node:fs';
+      fs.accessSync('/opt/opensession/quickjs.wasm');
+      fs.accessSync('/opt/opensession/codemode-worker.js');`);
+    const result = docker('exec', '--user', '1000:1000', '--workdir', '/workspace', name, 'opensession', 'codemode-smoke');
+    assert.match(result, /Script completed/);
+    assert.match(result, /\b42\b/);
+    console.log('Compiled codemode worker and QuickJS execution outside the release directory: passed');
+  }
   assert.equal((await (await fetch(`${origin}/api/settings/general`)).json()).organizationName, 'Umbrel Smoke Persistence');
   inside(`import fs from 'node:fs'; import assert from 'node:assert/strict';
     assert.equal(fs.readFileSync('/workspace/smoke-project.txt','utf8'), 'persistent project');
@@ -121,7 +138,7 @@ try {
     assert.ok(env.includes('OPENSESSION_WORKTREES_DIR=/workspace/.worktrees'));
     assert.ok(env.includes('OPENSESSION_SMOKE_VALUE=' + ${JSON.stringify(literal)}));
     assert.equal(fs.existsSync('/tmp/opensession-smoke-should-not-exist'), false);`);
-  console.log('Settings, project, worktree and full-home persistence after container replacement: passed');
+  console.log(`Settings, project, worktree and full-home persistence after ${seedImage === image ? 'container replacement' : 'version upgrade'}: passed`);
   console.log('Effective worktree path and literal saved-environment round trip: passed');
 
   // A dead kernel must stop the container, so restart:on-failure can recover it.

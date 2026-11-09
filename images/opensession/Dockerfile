@@ -4,7 +4,7 @@ FROM node:22.23.4-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e20
 
 ARG TARGETARCH
 LABEL org.opencontainers.image.title="Open Session for Umbrel" \
-      org.opencontainers.image.version="0.4.79-1" \
+      org.opencontainers.image.version="0.4.82-1" \
       org.opencontainers.image.source="https://github.com/kevmodrome/umbrel-community-app-store" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.description="Open Session browser workspace with persistent projects and provider sign-ins"
@@ -20,12 +20,12 @@ RUN apt-get update \
 # Retain the complete release: the compiled binary uses worker, image and WASM
 # sidecars. Verify the immutable upstream archive before extracting it.
 RUN case "$TARGETARCH" in \
-      amd64) upstream_arch=x64; checksum=38d1e5218a5c70e44ec3d106be48b76e3bfa6b148807fb157f76883e8f486b6d ;; \
-      arm64) upstream_arch=arm64; checksum=a36a0c78adbe1a814c14c375ef54dcdf9d5e428e9efd1085d10550073cf5cd28 ;; \
+      amd64) upstream_arch=x64; checksum=42269c52df840d496d2386f6dadafc9080f2da8085ec17e86dbe9b0df4e3b601 ;; \
+      arm64) upstream_arch=arm64; checksum=5552524e222a7be8773f042a48c179e986dcb14ce97213dd0fc26e3463419de6 ;; \
       *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1 ;; \
     esac \
     && curl --fail --location --retry 3 \
-       "https://github.com/tellahq/opensession/releases/download/v0.4.79/opensession-linux-${upstream_arch}.tar.gz" \
+       "https://github.com/tellahq/opensession/releases/download/v0.4.82/opensession-linux-${upstream_arch}.tar.gz" \
        --output /tmp/opensession.tar.gz \
     && printf '%s  /tmp/opensession.tar.gz\n' "$checksum" | sha256sum --check --strict \
     && mkdir -p /opt/opensession \

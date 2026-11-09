@@ -18,12 +18,15 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/kevmodrome/umbrel-opensession
-  IMAGE_TAG: 0.4.79-1
+  IMAGE_TAG: 0.4.82-1
+  PREVIOUS_IMAGE: ghcr.io/kevmodrome/umbrel-opensession:0.4.79-1@sha256:c7144dbcdc4408626fd6f661df513a97d5fbf50f4db1feccd04e3be43d97465a
 
 jobs:
   build:
     runs-on: ubuntu-24.04
     timeout-minutes: 40
+    outputs:
+      digest: ${{ steps.build.outputs.digest }}
     steps:
       - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -55,15 +58,50 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Test the published AMD64 image
+      - name: Set up Node.js for smoke checks
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Test the published AMD64 image and upgrade
         env:
           IMAGE_REF: ${{ env.IMAGE }}@${{ steps.build.outputs.digest }}
+          OPENSESSION_SMOKE_CODEMODE: "1"
         run: |
           docker pull --platform linux/amd64 "$IMAGE_REF"
+          docker pull --platform linux/amd64 "$PREVIOUS_IMAGE"
           bash images/opensession/smoke-test.sh "$IMAGE_REF"
+          OPENSESSION_SMOKE_SEED_IMAGE="$PREVIOUS_IMAGE" bash images/opensession/smoke-test.sh "$IMAGE_REF"
 
       - name: Record immutable image reference
         env:
           IMAGE_REF: ${{ env.IMAGE }}:${{ env.IMAGE_TAG }}@${{ steps.build.outputs.digest }}
         run: |
           printf '### Open Session image\n\n`%s`\n' "$IMAGE_REF" >> "$GITHUB_STEP_SUMMARY"
+
+  test-arm64:
+    needs: build
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Check out smoke checks
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js for smoke checks
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Test the published ARM64 image and upgrade
+        env:
+          IMAGE_REF: ${{ env.IMAGE }}@${{ needs.build.outputs.digest }}
+          OPENSESSION_SMOKE_CODEMODE: "1"
+        run: |
+          docker pull --platform linux/arm64 "$IMAGE_REF"
+          docker pull --platform linux/arm64 "$PREVIOUS_IMAGE"
+          bash images/opensession/smoke-test.sh "$IMAGE_REF"
+          OPENSESSION_SMOKE_SEED_IMAGE="$PREVIOUS_IMAGE" bash images/opensession/smoke-test.sh "$IMAGE_REF"
