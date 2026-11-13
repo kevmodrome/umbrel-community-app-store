@@ -20,7 +20,7 @@ export async function testRunnerIngress({ docker, inside, image, name, origin })
 
   inside(`import os from 'node:os'; import assert from 'node:assert/strict';
     const ip=Object.values(os.networkInterfaces()).flat().find(x=>x.family==='IPv4'&&!x.internal).address;
-    for (const port of [3852,2019]) {
+    for (const port of [13852,2019]) {
       await assert.rejects(fetch('http://'+ip+':'+port+'/ready', {signal:AbortSignal.timeout(2000)}));
     }
     console.log('Backend and proxy admin are not remotely listening');`);
@@ -31,7 +31,7 @@ export async function testRunnerIngress({ docker, inside, image, name, origin })
     });
     assert.ok(pid);
     const env=fs.readFileSync('/proc/'+pid+'/environ','utf8').split('\\0');
-    for (const value of ['HOST=127.0.0.1','PORT=3852','OPENSESSION_TRUST_FORWARDED_FOR=1']) assert.ok(env.includes(value),value);
+    for (const value of ['HOST=127.0.0.1','PORT=13852','OPENSESSION_TRUST_FORWARDED_FOR=1']) assert.ok(env.includes(value),value);
     console.log('Fixed loopback backend and forwarded-header trust');`);
 
   for (const path of ['/api/runners/register', '/api/runners/heartbeat', '/runner-ws']) {

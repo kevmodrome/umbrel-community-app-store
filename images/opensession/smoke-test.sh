@@ -21,6 +21,10 @@ const image = process.env.OPENSESSION_SMOKE_IMAGE;
 const seedImage = process.env.OPENSESSION_SMOKE_SEED_IMAGE || image;
 const name = `opensession-smoke-${process.pid}`;
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8' }).trim();
+// Shared validation also exercises the old pinned image, which has no ingress.
+// Candidate CI forces this flag so a missing capability label cannot skip it.
+const ingress = process.env.OPENSESSION_SMOKE_RUNNER_INGRESS === '1' ||
+  docker('image', 'inspect', '--format', '{{index .Config.Labels "io.opensession.umbrel.runner-ingress"}}', image) === '1';
 let created = false;
 let socket;
 async function start(reference = image) {
@@ -147,7 +151,7 @@ try {
   console.log(`Settings, project, worktree and full-home persistence after ${seedImage === image ? 'container replacement' : 'version upgrade'}: passed`);
   console.log('Effective worktree path and literal saved-environment round trip: passed');
 
-  await testRunnerIngress({ docker, inside, image, name, origin });
+  if (ingress) await testRunnerIngress({ docker, inside, image, name, origin });
 
   // A dead kernel must stop the container, so restart:on-failure can recover it.
   inside(`import fs from 'node:fs';
@@ -167,6 +171,7 @@ try {
   assert.notEqual(docker('inspect', '--format', '{{.State.ExitCode}}', name), '0');
   console.log('Kernel failure propagation and Docker restart eligibility: passed');
 
+  if (ingress) {
   remove();
   await start();
   inside(`import fs from 'node:fs';
@@ -185,6 +190,7 @@ try {
   assert.equal(exited, true, 'container stayed alive after ingress died');
   assert.notEqual(docker('inspect', '--format', '{{.State.ExitCode}}', name), '0');
   console.log('Non-root ingress and proxy failure propagation: passed');
+  }
 } catch (error) {
   if (created) { try { console.error(docker('logs', '--tail', '80', name)); } catch {} }
   throw error;

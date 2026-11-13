@@ -50,11 +50,13 @@ jobs:
       - name: Test clean install, replacement and Runner boundary
         env:
           OPENSESSION_SMOKE_CODEMODE: "1"
+          OPENSESSION_SMOKE_RUNNER_INGRESS: "1"
         run: bash images/opensession/smoke-test.sh opensession-ingress-check
 
       - name: Test persisted settings from the currently installed package
         env:
           OPENSESSION_SMOKE_CODEMODE: "1"
+          OPENSESSION_SMOKE_RUNNER_INGRESS: "1"
           OPENSESSION_SMOKE_SEED_IMAGE: ghcr.io/kevmodrome/umbrel-opensession:0.4.82-1@sha256:b037551f489791a8651eb5e1f5b038228985f5637c57e6e0a5fdefee6ff11519
         run: |
           docker pull "$OPENSESSION_SMOKE_SEED_IMAGE"

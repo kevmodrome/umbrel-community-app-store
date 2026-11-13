@@ -53,7 +53,7 @@ const env = {
   // settings. Only our local proxy may reach the backend. Never let dotenv or
   // a container override reopen it on the LAN while trusting forwarded headers.
   HOST: '127.0.0.1',
-  PORT: '3852',
+  PORT: '13852',
   OPENSESSION_TRUST_FORWARDED_FOR: '1',
   OPENSESSION_WORKTREES_DIR: '/workspace/.worktrees',
   OPENSESSION_SESSION_KERNEL_TOKEN: randomBytes(48).toString('hex'),

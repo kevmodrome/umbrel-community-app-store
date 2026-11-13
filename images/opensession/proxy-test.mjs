@@ -50,7 +50,7 @@ test('Caddy overwrites origin headers and rejects forged Runner ingress', { time
   await writeFile(join(root, 'Caddyfile'), template
     .replace('http://:3850 {', `http://127.0.0.1:${browser} {`)
     .replace('http://:3851 {', `http://127.0.0.1:${runner} {`)
-    .replaceAll('127.0.0.1:3852', `127.0.0.1:${backendPort}`));
+    .replaceAll('127.0.0.1:13852', `127.0.0.1:${backendPort}`));
   proxy = spawn(process.env.CADDY_BIN || 'caddy', ['run', '--config', join(root, 'Caddyfile'), '--adapter', 'caddyfile'], {
     env: { ...process.env, XDG_DATA_HOME: root, XDG_CONFIG_HOME: root }, stdio: ['ignore', 'pipe', 'pipe'],
   });

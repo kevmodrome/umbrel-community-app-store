@@ -57,7 +57,7 @@ The candidate supervises a non-root Caddy proxy alongside the server:
 | --- | --- |
 | `3850` | Existing Umbrel-authenticated browser route; Runner transport paths rejected |
 | `3851` | Opt-in Runner-only ingress; actual TCP peer must be `100.64.0.0/10` |
-| `127.0.0.1:3852` | Private application backend, never published |
+| `127.0.0.1:13852` | Private application backend, never published |
 
 The proxy overwrites `X-Forwarded-For` from the actual socket peer, strips
 other origin assertions, and forwards over loopback. The launcher forces the
@@ -87,7 +87,7 @@ No Runner port is published by the default app compose file.
 
    Leave `app_proxy`, its authentication, and its target port `3850` unchanged.
    Do not bind to `0.0.0.0`, your LAN address or a public address. Do not publish
-   backend `3852`, the session kernel, or the proxy admin port. An unavailable
+   backend `13852`, the session kernel, or the proxy admin port. An unavailable
    Tailscale interface should fail closed; never add a wildcard fallback.
 3. Restart Open Session using Umbrel so it recreates the container with the
    new mapping. Recheck the actual mapping with `docker port` or `docker

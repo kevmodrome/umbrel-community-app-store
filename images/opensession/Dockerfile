@@ -5,6 +5,7 @@ FROM node:22.23.4-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e20
 ARG TARGETARCH
 LABEL org.opencontainers.image.title="Open Session for Umbrel" \
       org.opencontainers.image.version="0.4.82-2" \
+      io.opensession.umbrel.runner-ingress="1" \
       org.opencontainers.image.source="https://github.com/kevmodrome/umbrel-community-app-store" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.description="Open Session browser workspace with persistent projects and provider sign-ins"
