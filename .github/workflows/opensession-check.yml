@@ -1,0 +1,61 @@
+name: Check Open Session ingress
+
+on:
+  pull_request:
+    paths:
+      - images/opensession/**
+      - .github/workflows/opensession-check.yml
+      - .github/workflows/opensession-image.yml
+  workflow_dispatch:
+
+# Build and test the candidate without publishing a registry tag or changing
+# the app's pinned production image. No provider or tailnet secrets required.
+permissions:
+  contents: read
+
+concurrency:
+  group: opensession-check-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            arch: amd64
+          - runner: ubuntu-24.04-arm
+            arch: arm64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+
+      - name: Build candidate locally, never publish
+        run: docker build --build-arg TARGETARCH=${{ matrix.arch }} -f images/opensession/Dockerfile -t opensession-ingress-check .
+
+      - name: Validate ingress configuration as the service user
+        run: docker run --rm --network none --user 1000:1000 --entrypoint caddy opensession-ingress-check validate --config /usr/local/lib/opensession/Caddyfile --adapter caddyfile
+
+      - name: Test real proxy header handling without external networking
+        run: docker run --rm --network none --user 1000:1000 --volume "$PWD/images/opensession:/tests:ro" --entrypoint node opensession-ingress-check --test /tests/proxy-test.mjs
+
+      - name: Test clean install, replacement and Runner boundary
+        env:
+          OPENSESSION_SMOKE_CODEMODE: "1"
+        run: bash images/opensession/smoke-test.sh opensession-ingress-check
+
+      - name: Test persisted settings from the currently installed package
+        env:
+          OPENSESSION_SMOKE_CODEMODE: "1"
+          OPENSESSION_SMOKE_SEED_IMAGE: ghcr.io/kevmodrome/umbrel-opensession:0.4.82-1@sha256:b037551f489791a8651eb5e1f5b038228985f5637c57e6e0a5fdefee6ff11519
+        run: |
+          docker pull "$OPENSESSION_SMOKE_SEED_IMAGE"
+          bash images/opensession/smoke-test.sh opensession-ingress-check

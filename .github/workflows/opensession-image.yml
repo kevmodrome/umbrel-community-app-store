@@ -18,7 +18,7 @@ concurrency:
 
 env:
   IMAGE: ghcr.io/kevmodrome/umbrel-opensession
-  IMAGE_TAG: 0.4.82-1
+  IMAGE_TAG: 0.4.82-2
   PREVIOUS_IMAGE: ghcr.io/kevmodrome/umbrel-opensession:0.4.79-1@sha256:c7144dbcdc4408626fd6f661df513a97d5fbf50f4db1feccd04e3be43d97465a
 
 jobs:

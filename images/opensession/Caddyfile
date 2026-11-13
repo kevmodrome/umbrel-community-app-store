@@ -1,0 +1,42 @@
+{
+	auto_https off
+	admin off
+}
+
+# The existing Umbrel app proxy remains the authentication gate for the UI.
+# Its container address is NOT evidence of a Runner's Tailscale origin.
+http://:3850 {
+	@runner path /api/runners/register /api/runners/heartbeat /runner-ws
+	route {
+		respond @runner "Use the dedicated Tailscale Runner endpoint" 403
+		reverse_proxy 127.0.0.1:3852 {
+			header_up X-Forwarded-For {http.request.remote.host}
+			header_up X-Forwarded-Host {http.request.hostport}
+			header_up X-Forwarded-Proto http
+			header_up -Forwarded
+			header_up -X-Real-IP
+		}
+	}
+}
+
+# Opt-in ONLY: publish 3851 on the Umbrel host's specific Tailscale IPv4.
+# Never route this listener through Umbrel's app proxy (it loses the source IP).
+# Check the actual socket peer, not any client-supplied forwarding header.
+http://:3851 {
+	@outside not remote_ip 100.64.0.0/10
+	@runner path /api/runners/register /api/runners/heartbeat /runner-ws
+	# route preserves this order: source check MUST precede proxying.
+	route {
+		respond @outside "Runner connections require a Tailscale source address" 403
+		reverse_proxy @runner 127.0.0.1:3852 {
+			header_up X-Forwarded-For {http.request.remote.host}
+			header_up X-Forwarded-Host {http.request.hostport}
+			header_up X-Forwarded-Proto http
+			header_up -Forwarded
+			header_up -X-Real-IP
+		}
+		# This endpoint must not bypass Umbrel login for the UI, settings, pair-code
+		# creation, browser terminals, or other APIs, even for a tailnet peer.
+		respond "Not found" 404
+	}
+}
