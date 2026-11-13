@@ -19,7 +19,7 @@ if (!existsSync(configPath)) {
   if (setup.error) throw setup.error;
   if (setup.status !== 0) process.exit(setup.status ?? 1);
   const config = JSON.parse(readFileSync(configPath, 'utf8'));
-  config.server.host = process.env.HOST || '0.0.0.0';
+  config.server.host = '127.0.0.1';
   config.server.publicBaseUrl = process.env.OPENSESSION_UI_BASE || 'http://umbrel.local:13850';
   config.paths.worktreesDir = '/workspace/.worktrees';
   config.paths.mcpConfig = join(state, 'mcp-config.json');
@@ -49,6 +49,12 @@ if (existsSync(envPath)) {
 }
 const env = {
   ...savedEnv, ...process.env,
+  // These are an indivisible ingress boundary, including for saved pre-upgrade
+  // settings. Only our local proxy may reach the backend. Never let dotenv or
+  // a container override reopen it on the LAN while trusting forwarded headers.
+  HOST: '127.0.0.1',
+  PORT: '13852',
+  OPENSESSION_TRUST_FORWARDED_FOR: '1',
   OPENSESSION_WORKTREES_DIR: '/workspace/.worktrees',
   OPENSESSION_SESSION_KERNEL_TOKEN: randomBytes(48).toString('hex'),
 };
@@ -72,23 +78,27 @@ function stop(code) {
 process.on('SIGTERM', () => stop(0));
 process.on('SIGINT', () => stop(0));
 
-function start(command, critical = true) {
-  const child = spawn('opensession', [command], {
+function supervise(executable, args, label, critical = true) {
+  const child = spawn(executable, args, {
     cwd: '/opt/opensession', env, stdio: 'inherit',
   });
   children.add(child);
   child.once('error', error => {
-    console.error(`Open Session ${command} failed: ${error.message}`);
+    console.error(`Open Session ${label} failed: ${error.message}`);
     stop(1);
   });
   child.once('exit', (code, signal) => {
     children.delete(child);
     if (critical && !stopping) {
-      console.error(`Open Session ${command} exited (${signal || code}); restarting the container.`);
+      console.error(`Open Session ${label} exited (${signal || code}); restarting the container.`);
       stop(1);
     }
   });
   return child;
+}
+
+function start(command, critical = true) {
+  return supervise('opensession', [command], command, critical);
 }
 
 start('session-kernel-service');
@@ -110,5 +120,9 @@ if (!ready || stopping) {
     seed.once('error', () => resolve(1));
   });
   if (seeded !== 0 || stopping) stop(1);
-  else start('server');
+  else {
+    start('server');
+    supervise('caddy', ['run', '--config', '/usr/local/lib/opensession/Caddyfile',
+      '--adapter', 'caddyfile'], 'ingress');
+  }
 }

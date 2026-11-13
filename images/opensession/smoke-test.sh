@@ -6,6 +6,7 @@ export OPENSESSION_SMOKE_IMAGE="${1:?Usage: bash images/opensession/smoke-test.s
 # No real provider sign-in, GitHub token or model request is involved.
 node --input-type=module <<'JS'
 import assert from 'node:assert/strict';
+import { testRunnerIngress } from './images/opensession/runner-ingress-test.mjs';
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -20,11 +21,18 @@ const image = process.env.OPENSESSION_SMOKE_IMAGE;
 const seedImage = process.env.OPENSESSION_SMOKE_SEED_IMAGE || image;
 const name = `opensession-smoke-${process.pid}`;
 const docker = (...args) => execFileSync('docker', args, { encoding: 'utf8' }).trim();
+// Shared validation also exercises the old pinned image, which has no ingress.
+// Candidate CI forces this flag so a missing capability label cannot skip it.
+const ingress = process.env.OPENSESSION_SMOKE_RUNNER_INGRESS === '1' ||
+  docker('image', 'inspect', '--format', '{{index .Config.Labels "io.opensession.umbrel.runner-ingress"}}', image) === '1';
 let created = false;
 let socket;
 async function start(reference = image) {
   docker('run', '--detach', '--name', name,
     '--env', 'OPENSESSION_UI_BASE=http://umbrel.local:13850',
+    // Legacy/misconfigured values must never reopen the trusted backend.
+    '--env', 'HOST=0.0.0.0', '--env', 'PORT=3850',
+    '--env', 'OPENSESSION_TRUST_FORWARDED_FOR=0',
     '--publish', '127.0.0.1::3850',
     '--volume', `${home}:/home/opensession`, '--volume', `${workspace}:/workspace`, reference);
   created = true;
@@ -110,6 +118,8 @@ try {
   inside(`import fs from 'node:fs';
     fs.appendFileSync('/home/opensession/.opensession.env', ${JSON.stringify('\nOPENSESSION_SMOKE_VALUE=' + JSON.stringify(literal) + '\n')});`);
 
+  inside(`import fs from 'node:fs';
+    fs.appendFileSync('/home/opensession/.opensession.env', ${JSON.stringify('\nHOST=0.0.0.0\nPORT=3850\nOPENSESSION_TRUST_FORWARDED_FOR=0\n')});`);
   remove();
   origin = await start();
   checkVersion(image);
@@ -141,6 +151,8 @@ try {
   console.log(`Settings, project, worktree and full-home persistence after ${seedImage === image ? 'container replacement' : 'version upgrade'}: passed`);
   console.log('Effective worktree path and literal saved-environment round trip: passed');
 
+  if (ingress) await testRunnerIngress({ docker, inside, image, name, origin });
+
   // A dead kernel must stop the container, so restart:on-failure can recover it.
   inside(`import fs from 'node:fs';
     const pid=fs.readdirSync('/proc').filter(x=>/^\\d+$/.test(x)).find(x=>{
@@ -158,6 +170,27 @@ try {
   assert.equal(exited, true, 'container stayed alive after its session kernel died');
   assert.notEqual(docker('inspect', '--format', '{{.State.ExitCode}}', name), '0');
   console.log('Kernel failure propagation and Docker restart eligibility: passed');
+
+  if (ingress) {
+  remove();
+  await start();
+  inside(`import fs from 'node:fs';
+    const pid=fs.readdirSync('/proc').filter(x=>/^\\d+$/.test(x)).find(x=>{
+      try { const args=fs.readFileSync('/proc/'+x+'/cmdline','utf8').split('\\0');
+        return args[0].endsWith('/caddy') || args[0]==='caddy'; } catch { return false; }
+    });
+    if (!pid) throw new Error('ingress process missing');
+    if (!/^Uid:\\s+1000\\s/m.test(fs.readFileSync('/proc/'+pid+'/status','utf8'))) throw new Error('ingress is not UID1000');
+    process.kill(Number(pid),'SIGKILL');`);
+  exited = false;
+  for (let attempt = 0; attempt < 30; attempt++) {
+    if (docker('inspect', '--format', '{{.State.Running}}', name) === 'false') { exited = true; break; }
+    await delay(1000);
+  }
+  assert.equal(exited, true, 'container stayed alive after ingress died');
+  assert.notEqual(docker('inspect', '--format', '{{.State.ExitCode}}', name), '0');
+  console.log('Non-root ingress and proxy failure propagation: passed');
+  }
 } catch (error) {
   if (created) { try { console.error(docker('logs', '--tail', '80', name)); } catch {} }
   throw error;

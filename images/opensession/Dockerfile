@@ -4,14 +4,15 @@ FROM node:22.23.4-bookworm-slim@sha256:4b150b48b4116e2a22f2c39cc27025fbf4f153e20
 
 ARG TARGETARCH
 LABEL org.opencontainers.image.title="Open Session for Umbrel" \
-      org.opencontainers.image.version="0.4.82-1" \
+      org.opencontainers.image.version="0.4.82-2" \
+      io.opensession.umbrel.runner-ingress="1" \
       org.opencontainers.image.source="https://github.com/kevmodrome/umbrel-community-app-store" \
       org.opencontainers.image.licenses="MIT" \
       org.opencontainers.image.description="Open Session browser workspace with persistent projects and provider sign-ins"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
-       bash ca-certificates curl git gh openssh-client ripgrep tini gosu \
+       bash ca-certificates caddy curl git gh openssh-client ripgrep tini gosu \
        libatomic1 libstdc++6 python3 build-essential unzip \
     && rm -rf /var/lib/apt/lists/* \
     && groupmod -n opensession node \
@@ -45,16 +46,16 @@ RUN ln -s bun /usr/local/bin/bunx \
 
 COPY --chmod=755 images/opensession/entrypoint.sh /usr/local/bin/opensession-umbrel
 COPY images/opensession/start.mjs /usr/local/lib/opensession/start.mjs
+COPY images/opensession/Caddyfile /usr/local/lib/opensession/Caddyfile
 ENV HOME=/home/opensession \
     SHELL=/bin/bash \
     PATH=/home/opensession/.local/bin:/home/opensession/.opensession/bin:/usr/local/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin \
     NPM_CONFIG_PREFIX=/home/opensession/.local \
     NODE_ENV=production \
-    HOST=0.0.0.0 \
-    PORT=3850 \
     OPENSESSION_CLAUDE_AUTO_UPDATE=0
 WORKDIR /workspace
 EXPOSE 3850
+# 3851 is an opt-in, source-checked Runner listener; never publish it globally.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
     CMD curl --fail --silent http://127.0.0.1:3850/ready >/dev/null || exit 1
 ENTRYPOINT ["/usr/bin/tini", "-g", "--", "/usr/local/bin/opensession-umbrel"]
